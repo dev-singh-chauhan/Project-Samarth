@@ -1,11 +1,23 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-from Gemini_qa_engine import answer_question
-import speech_recognition as sr
-from gtts import gTTS
-import tempfile
-import os
+try:
+    import streamlit as st
+    import pandas as pd
+    import plotly.express as px
+    from Gemini_qa_engine import answer_question
+    voice_supported = False
+
+    # Try importing optional modules (safe for Streamlit Cloud)
+    try:
+        import speech_recognition as sr
+        from gtts import gTTS
+        import tempfile
+        import os
+        voice_supported = True
+    except ImportError:
+        st.warning("🎙️ Voice features not supported on this deployment environment.")
+
+except Exception as e:
+    st.error(f"Critical import error: {e}")
+    st.stop()
 
 # -----------------------------------------------
 # 🌱 PAGE CONFIGURATION
@@ -27,21 +39,29 @@ try:
     for col in ["Rainfall_mm", "Production_Tonnes", "Area_Hectare", "Year"]:
         if col in data.columns:
             data[col] = pd.to_numeric(data[col], errors="coerce")
-    st.sidebar.success("Data loaded successfully!")
+    st.sidebar.success("✅ Data loaded successfully!")
 except Exception as e:
-    st.sidebar.error(f"Error loading data: {e}")
+    st.sidebar.error(f"⚠️ Error loading data: {e}")
     data = None
 
 # -----------------------------------------------
 # 🧭 CREATE TABS
 # -----------------------------------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📊 Data Insights",
-    "📈 Advanced Analytics",
-    "💬 Ask Samarth AI",
-    "🎤 Talk to Samarth",
-    "ℹ️ About Project"
-])
+if voice_supported:
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Data Insights",
+        "📈 Advanced Analytics",
+        "💬 Ask Samarth AI",
+        "🎤 Talk to Samarth",
+        "ℹ️ About Project"
+    ])
+else:
+    tab1, tab2, tab3, tab5 = st.tabs([
+        "📊 Data Insights",
+        "📈 Advanced Analytics",
+        "💬 Ask Samarth AI",
+        "ℹ️ About Project"
+    ])
 
 # -----------------------------------------------
 # TAB 1: DATA INSIGHTS
@@ -75,7 +95,7 @@ with tab1:
         st.error("⚠️ Data not loaded. Please check final_merged_data.csv file.")
 
 # -----------------------------------------------
-# TAB 2: ADVANCED ANALYTICS (Step 3.2)
+# TAB 2: ADVANCED ANALYTICS
 # -----------------------------------------------
 with tab2:
     if data is not None:
@@ -91,7 +111,6 @@ with tab2:
 
         if states:
             df_filtered = df_filtered[df_filtered["State"].isin(states)]
-
         if crops:
             df_filtered = df_filtered[df_filtered["Crop"].isin(crops)]
 
@@ -121,7 +140,7 @@ with tab2:
             st.warning("Select at least one State and one Crop to analyze.")
 
 # -----------------------------------------------
-# TAB 3: ASK SAMARTH AI (Step 3.1 + 3.3)
+# TAB 3: ASK SAMARTH AI
 # -----------------------------------------------
 with tab3:
     st.subheader("💬 Ask Samarth AI Anything")
@@ -138,23 +157,19 @@ with tab3:
     if st.button("Ask Question"):
         if user_query.strip():
             with st.spinner("Gemini is analyzing your question..."):
-                # Build a contextual summary snippet for Gemini
-                sample = data.sample(min(500, len(data)))  # small context snippet
+                sample = data.sample(min(500, len(data)))
                 context = sample[["State", "Year", "Crop", "Rainfall_mm", "Production_Tonnes"]].to_csv(index=False)
 
                 prompt = f"""
 You are Samarth AI, an expert on Indian agriculture and climate data.
-The user asked: "{user_query}"
+User asked: "{user_query}"
 Use the following dataset context (from data.gov.in merged rainfall & crop datasets):
 
 {context}
 
-Provide a factual, concise answer. Always cite sources such as 'Source: data.gov.in — IMD rainfall dataset' and 'Source: Ministry of Agriculture production dataset' when referencing data.
-If a chart would help, briefly describe which chart could visualize it.
+Provide a factual, concise answer and cite data sources.
 """
-
                 response = answer_question(prompt)
-
                 if include_sources:
                     response += "\n\n📘 Source: data.gov.in — IMD Rainfall & Ministry of Agriculture datasets"
 
@@ -164,39 +179,36 @@ If a chart would help, briefly describe which chart could visualize it.
             st.warning("Please enter a question first.")
 
 # -----------------------------------------------
-# TAB 4: TALK TO SAMARTH (Voice + AI)
+# TAB 4: TALK TO SAMARTH (Voice)
 # -----------------------------------------------
-with tab4:
-    st.subheader("🎙️ Talk to Samarth (Voice AI)")
-    st.markdown("Click below to speak your question:")
+if voice_supported:
+    with tab4:
+        st.subheader("🎙️ Talk to Samarth (Voice AI)")
+        st.markdown("Click below to speak your question:")
 
-    if st.button("🎤 Start Recording"):
-        recognizer = sr.Recognizer()
-        with sr.Microphone() as source:
-            st.info("🎧 Listening... please speak now.")
-            audio = recognizer.listen(source, phrase_time_limit=8)
+        if st.button("🎤 Start Recording"):
+            recognizer = sr.Recognizer()
+            try:
+                with sr.Microphone() as source:
+                    st.info("🎧 Listening... please speak now.")
+                    audio = recognizer.listen(source, phrase_time_limit=8)
 
-        try:
-            user_question = recognizer.recognize_google(audio)
-            st.success(f"🗣️ You said: {user_question}")
+                user_question = recognizer.recognize_google(audio)
+                st.success(f"🗣️ You said: {user_question}")
 
-            with st.spinner("Samarth is thinking..."):
-                ai_answer = answer_question(user_question)
-                ai_answer += "\n\n📘 Source: data.gov.in — IMD & Ministry of Agriculture"
-                st.write(ai_answer)
+                with st.spinner("Samarth is thinking..."):
+                    ai_answer = answer_question(user_question)
+                    ai_answer += "\n\n📘 Source: data.gov.in — IMD & Ministry of Agriculture"
+                    st.write(ai_answer)
 
-            # 🔊 Speak the answer
-            tts = gTTS(ai_answer)
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-            tts.save(temp_file.name)
-            st.audio(temp_file.name, format="audio/mp3")
+                # 🔊 Text-to-Speech
+                tts = gTTS(ai_answer)
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+                tts.save(temp_file.name)
+                st.audio(temp_file.name, format="audio/mp3")
 
-        except sr.UnknownValueError:
-            st.error("❌ Could not understand your voice.")
-        except sr.RequestError:
-            st.error("⚠️ Speech Recognition service error.")
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
+            except Exception as e:
+                st.error(f"⚠️ Voice recognition unavailable or failed: {e}")
 
 # -----------------------------------------------
 # TAB 5: ABOUT PROJECT
@@ -204,25 +216,22 @@ with tab4:
 with tab5:
     st.header("ℹ️ About Project Samarth")
     st.markdown("""
-**Project Samarth** is an intelligent agricultural analytics system that combines **open government data** with **Gemini AI reasoning**.
+**Project Samarth** is an intelligent agricultural analytics system combining **open government data** with **Gemini AI reasoning**.
 
 ### 💡 Key Features
 - 🌧️ Real-time Rainfall & Crop Correlation Analysis  
 - 🤖 Gemini-powered Q&A and reasoning  
-- 🎤 Voice interaction using SpeechRecognition + gTTS  
+- 🎤 Voice interaction (where supported)  
 - 📊 Advanced visualization with Plotly  
-- 🔗 Data Source: [data.gov.in](https://data.gov.in)
+- 🔗 Source: [data.gov.in](https://data.gov.in)
 
 ### 🧠 Architecture
-1. **Data Layer:** Rainfall + Crop datasets (IMD + Ministry of Agriculture)  
-2. **AI Layer:** Gemini Q&A reasoning over structured data context  
+1. **Data Layer:** IMD + Ministry of Agriculture datasets  
+2. **AI Layer:** Gemini Q&A reasoning  
 3. **Frontend:** Streamlit dashboard with charts, chat, and voice
 
 ---
 🌾 *Empowering Indian Agriculture through AI and Open Data (© 2025)*
 """)
-    
-st.caption("🌱 Developed by Dev Singh Chauhan | Powered by Gemini AI | Project Samarth © 2025")    
 
-
-
+st.caption("🌱 Developed by Dev Singh Chauhan | Powered by Gemini AI | Project Samarth © 2025")
