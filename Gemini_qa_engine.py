@@ -2,12 +2,21 @@ import os
 import pandas as pd
 import google.generativeai as genai
 from dotenv import load_dotenv
-# ================== SETUP ==================
-# 🔑 Load Gemini API key securely from Streamlit secrets or .env
-if "GOOGLE_API_KEY" in st.secrets:
-    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+import streamlit as st  # ✅ Import Streamlit
 
-genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+# ================== SETUP ==================
+# 🔑 Load environment variables from .env (for local development)
+load_dotenv()
+
+# ✅ Safe Streamlit secrets check (works locally + on Streamlit Cloud)
+secrets = getattr(st, "secrets", {})
+api_key = secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+if not api_key:
+    raise ValueError("❌ GOOGLE_API_KEY not found! Please add it to .env (for local) or Streamlit Secrets (for cloud).")
+
+# ✅ Configure Gemini with API key
+genai.configure(api_key=api_key)
 
 # Load Gemini model
 MODEL_NAME = "models/gemini-2.5-flash"
