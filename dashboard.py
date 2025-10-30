@@ -3,6 +3,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from Gemini_qa_engine import answer_question
+# -----------------------------------------------
+# 🌱 PAGE CONFIGURATION
+# -----------------------------------------------
+st.set_page_config(page_title="Project Samarth", layout="wide", page_icon="🌾")
 
 try:
     import streamlit as st
@@ -25,10 +29,7 @@ except Exception as e:
     st.error(f"Critical import error: {e}")
     st.stop()
 
-# -----------------------------------------------
-# 🌱 PAGE CONFIGURATION
-# -----------------------------------------------
-st.set_page_config(page_title="Project Samarth", layout="wide", page_icon="🌾")
+
 
 # -----------------------------------------------
 # 🌾 HEADER
