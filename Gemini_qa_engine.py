@@ -7,11 +7,12 @@ from dotenv import load_dotenv
 # 🔐 Load environment variables from .env (keep your key safe)
 load_dotenv()
 
-api_key = os.getenv("AIzaSyCeuJjPUJs4LJfsF3g9x-UaYP_NzQnQugM")
-if not api_key:
-    raise ValueError("❌ GOOGLE_API_KEY not found. Please add it to your .env file.")
+# ================== SETUP ==================
+# 🔑 Load Gemini API key securely from Streamlit secrets or .env
+if "GOOGLE_API_KEY" in st.secrets:
+    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
-genai.configure(api_key=api_key)
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 # Load Gemini model
 MODEL_NAME = "models/gemini-2.5-flash"
