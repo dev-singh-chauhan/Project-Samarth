@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import google.generativeai as genai
+import streamlit as st
 from dotenv import load_dotenv
 
 # ================== SETUP ==================
